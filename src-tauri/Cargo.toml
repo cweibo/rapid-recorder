@@ -1,0 +1,22 @@
+[package]
+name = "antigravity-recorder"
+version = "0.0.0"
+description = "High Performance Screen Recorder"
+authors = ["Antigravity"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+cc = "1.0"
+
+[dependencies]
+tauri = { version = "2.0.0", features = [] }
+tauri-plugin-shell = "2.0.0"
+tauri-plugin-dialog = "2.0.0"
+tauri-plugin-recorder = { path = "./recorder" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+libc = "0.2"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

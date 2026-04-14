@@ -1,0 +1,10 @@
+[[permission]]
+identifier = "default"
+description = "Default permissions for recorder plugin"
+commands.allow = [
+    "ping",
+    "start_recording",
+    "stop_recording",
+    "get_elapsed",
+    "is_recording"
+]

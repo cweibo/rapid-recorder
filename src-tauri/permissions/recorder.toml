@@ -1,0 +1,12 @@
+[[permission]]
+identifier = "allowall"
+description = "Allows all recording commands"
+
+[commands]
+allow = [
+    "ping",
+    "start_recording",
+    "stop_recording",
+    "get_elapsed",
+    "is_recording"
+]
