@@ -80,7 +80,6 @@ onMounted(async () => {
     
     // IPC 心跳测试
     await invoke('plugin:recorder|ping');
-    ElMessage.success('录屏核心已就绪 (IPC Handshake OK)');
   } catch (e) {
     console.error('IPC 连接失败', e);
     // 尝试输出更详细的错误原因
@@ -123,7 +122,6 @@ async function toggleRecording() {
       intervalId = setInterval(async () => {
         elapsedSeconds.value = await invoke('plugin:recorder|get_elapsed');
       }, 1000);
-      ElMessage.success(`录制已开始: ${filename}`);
     } catch (err) {
       console.error('Start recording failed:', err);
       ElMessage.error(`录制启动失败: ${err}`);
@@ -136,7 +134,6 @@ async function toggleRecording() {
         clearInterval(intervalId);
         intervalId = null;
       }
-      ElMessage.info('录制已停止');
     } catch (err) {
       console.error('Stop recording failed:', err);
       ElMessage.error(`停止失败: ${err}`);
