@@ -174,7 +174,10 @@ void Recorder::EncodingThread(OutputFormat format) {
                 encodedCount++;
             }
         } else {
-            m_gifEncoder.WriteFrame(frame.data.data(), stride);
+            // Optimization: Sampling 1 out of every 3 frames for GIF (30 FPS -> 10 FPS)
+            if (encodedCount % 3 == 0) {
+                m_gifEncoder.WriteFrame(frame.data.data(), stride);
+            }
             encodedCount++;
         }
     }

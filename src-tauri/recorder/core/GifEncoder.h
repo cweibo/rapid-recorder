@@ -13,12 +13,14 @@ public:
 private:
     ComPtr<IWICImagingFactory> m_factory;
     ComPtr<IWICBitmapEncoder> m_encoder;
-    ComPtr<IWICStream> m_stream; // Prevent stream from being closed during writing
+    ComPtr<IWICStream> m_stream;
+    ComPtr<IWICPalette> m_palette; // Global palette for compression
     UINT m_width = 0;
     UINT m_height = 0;
     UINT m_origWidth = 0;
     UINT m_origHeight = 0;
     bool m_isInitialized = false;
+    bool m_hasPalette = false;
 
     std::vector<BYTE> m_flippedBuffer;
 };

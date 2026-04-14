@@ -10,11 +10,11 @@ HRESULT GifEncoder::Initialize(const std::wstring& filename, UINT width, UINT he
     m_origWidth = width;
     m_origHeight = height;
     
-    // Performance: Downscale to 1280 base width if source is larger
-    if (width > 1280) {
+    // Performance: Downscale to 800 base width if source is larger (Optimized for size)
+    if (width > 800) {
         float ratio = (float)height / width;
-        m_width = 1280;
-        m_height = (UINT)(1280 * ratio);
+        m_width = 800;
+        m_height = (UINT)(800 * ratio);
     } else {
         m_width = width;
         m_height = height;
@@ -35,9 +35,35 @@ HRESULT GifEncoder::Initialize(const std::wstring& filename, UINT width, UINT he
     hr = m_encoder->Initialize(m_stream.Get(), WICBitmapEncoderNoCache);
     if (FAILED(hr)) return hr;
 
+    // Set Global Metadata: LoopCount (0 = infinite)
+    ComPtr<IWICMetadataQueryWriter> metaWriter;
+    if (SUCCEEDED(m_encoder->GetMetadataQueryWriter(&metaWriter))) {
+        PROPVARIANT pv;
+        PropVariantInit(&pv);
+        pv.vt = VT_UI2;
+        pv.uiVal = 0;
+        metaWriter->SetMetadataByName(L"/appext/Application", &pv); // May fail on some systems, continue anyway
+        
+        // Loop count specifically
+        PropVariantInit(&pv);
+        pv.vt = VT_UI1 | VT_ARRAY;
+        // NETSCAPE2.0 loop block
+        SAFEARRAY* sa = SafeArrayCreateVector(VT_UI1, 0, 11);
+        if (sa) {
+            void* pData;
+            SafeArrayAccessData(sa, &pData);
+            memcpy(pData, "NETSCAPE2.0", 11);
+            SafeArrayUnaccessData(sa);
+            pv.parray = sa;
+            metaWriter->SetMetadataByName(L"/appext/Data", &pv);
+            SafeArrayDestroy(sa);
+        }
+    }
+
     m_flippedBuffer.resize(m_origWidth * m_origHeight * 4);
     m_isInitialized = true;
-    Log("GifEncoder Initialized: " + std::to_string(m_width) + "x" + std::to_string(m_height) + " (Source: " + std::to_string(m_origWidth) + "x" + std::to_string(m_origHeight) + ")");
+    m_hasPalette = false;
+    Log("GifEncoder Optimized: " + std::to_string(m_width) + "x" + std::to_string(m_height) + " (Source: " + std::to_string(m_origWidth) + "x" + std::to_string(m_origHeight) + ")");
     return S_OK;
 }
 
@@ -85,7 +111,51 @@ bool GifEncoder::WriteFrame(const BYTE* pData, UINT stride) {
     hr = frameEncode->SetSize(m_width, m_height);
     if (FAILED(hr)) return false;
 
-    WICPixelFormatGUID format = GUID_WICPixelFormat8bppIndexed; // GIF standard
+    // 5. Manage Palette (Crucial for compression)
+    if (!m_hasPalette) {
+        hr = m_factory->CreatePalette(&m_palette);
+        if (SUCCEEDED(hr)) {
+            // Generate palette from the first frame
+            hr = m_palette->InitializeFromBitmap(source.Get(), 256, FALSE);
+            if (SUCCEEDED(hr)) {
+                m_hasPalette = true;
+                m_encoder->SetPalette(m_palette.Get());
+            }
+        }
+    }
+
+    if (m_hasPalette) {
+        frameEncode->SetPalette(m_palette.Get());
+    }
+
+    // 6. Color Quantization: Use Format Converter (Crucial to avoid black screen)
+    ComPtr<IWICFormatConverter> converter;
+    hr = m_factory->CreateFormatConverter(&converter);
+    if (SUCCEEDED(hr)) {
+        hr = converter->Initialize(
+            source.Get(), 
+            GUID_WICPixelFormat8bppIndexed, 
+            WICBitmapDitherTypeNone, 
+            m_palette.Get(), 
+            0.0f, 
+            WICBitmapPaletteTypeMedianCut
+        );
+        if (SUCCEEDED(hr)) {
+            source = converter; // Use converted source
+        }
+    }
+
+    // 7. Set Frame Metadata: Delay
+    ComPtr<IWICMetadataQueryWriter> frameMeta;
+    if (SUCCEEDED(frameEncode->GetMetadataQueryWriter(&frameMeta))) {
+        PROPVARIANT pv;
+        PropVariantInit(&pv);
+        pv.vt = VT_UI2;
+        pv.uiVal = 10; // 10 centiseconds = 100ms = 10 FPS
+        frameMeta->SetMetadataByName(L"/grctlext/Delay", &pv);
+    }
+
+    WICPixelFormatGUID format = GUID_WICPixelFormat8bppIndexed; 
     hr = frameEncode->SetPixelFormat(&format);
     if (FAILED(hr)) return false;
 
